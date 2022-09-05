@@ -15,6 +15,8 @@ import { ethers } from "ethers";
 import { currency } from "../constants";
 import CountDownTimer from "../components/CountDownTimer";
 import toast from "react-hot-toast";
+import Marquee from "react-fast-marquee";
+import AdminControls from "../components/AdminControls";
 
 const Home: NextPage = () => {
   const address = useAddress();
@@ -49,8 +51,33 @@ const Home: NextPage = () => {
 
   const { data: tickets } = useContractData(contract, "getTickets");
 
+  const {data: winnings} = useContractData(contract, "getWinningsForAddress", address);
+  console.log(winnings)
+
+  const { mutateAsync: WithdrawWinnings } = useContractCall(contract, "WithdrawWinnings")
+
+  const {data: lastWinner} = useContractData(contract, "lastWinner");
+  const {data: lastWinnerAmount} = useContractData(contract, "lastWinnerAmount")
   const [quantity, setQuantity] = useState<number>(1);
 
+
+  const onWithdrawWinnings = async () => {
+    const notification = toast.loading('Withdrawing winnings...');
+    try {
+      const data = await WithdrawWinnings([{}]);
+
+            toast.success("Winnings withdrawn successfully!", {
+        id: notification,
+      });
+    } catch (error) {
+      toast.error("Whoops something went wrong!", {
+        id: notification,
+      });
+      console.error("contract call failure", error);
+    }
+  }
+
+  const {data: isLotteryOperator} = useContractData(contract, "lotteryOperator")
   useEffect(() => {
     if (!tickets) return;
 
@@ -98,7 +125,32 @@ const Home: NextPage = () => {
       <Head>
         <title>The crypto lottery</title>
       </Head>
-      <Header />
+      <Header/>
+
+      <Marquee className="bg-[#0A1F1C] p-5 m-5" gradient={false} speed={100}>
+        <div className="flex space-x-2 mx-10">
+          <h4 className="text-white">Last Winner:{" "}{lastWinner?.toString()}</h4>
+          <h4 className="text-white">Previous winnings:{" "}{lastWinnerAmount && ethers.utils.formatEther(lastWinnerAmount?.toString())}{" "}{currency}</h4>
+        </div>
+      </Marquee>
+
+      {isLotteryOperator === address && (
+        <div className="flex justify-center">
+          <AdminControls/>
+        </div>
+      )}
+      
+      {winnings > 0 && (
+        <div className="max-w-md md:max-w-2xl lg:max-w-4xl mx-auto mt-5">
+        <button onClick={onWithdrawWinnings} className="p-5 bg-gradient-to-b from-orange-500 to-emerald-600 animate-pulse text-center rounded-xl w-full">
+          <p className="font-bold">Winner Winner Chicken Dinner!</p>
+          <p>Total winnings:{" "}{ethers.utils.formatEther(winnings.toString())}{" "}{currency }</p>
+          <br/>
+          <p className="font-semibold">Click here to withdraw</p>
+        </button>
+        </div>
+      )}
+      
       {/*The Next Draw Box*/}
       <div className="flex justify-center">
         <div className="space-y-5 md:space-y-0 m-5 md:flex md:flex-row items-start gap-4">
